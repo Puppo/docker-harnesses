@@ -1,0 +1,10 @@
+#!/bin/bash
+
+set -e
+
+# Run user-customizable init script
+bash /usr/local/bin/init
+
+# Start Paseo CLI (provides unified interface over Claude Code + Codex)
+echo "Starting Paseo CLI..."
+exec paseo
