@@ -24,7 +24,7 @@ Most AI coding CLIs are released frequently and expect to be run as the containe
 
 | Image | Tags | Tools bundled | Entrypoint |
 |---|---|---|---|
-| [`delpuppoluca/ai-harness`](https://hub.docker.com/r/delpuppoluca/ai-harness) | `latest` | [`@anthropic-ai/claude-code`](https://www.npmjs.com/package/@anthropic-ai/claude-code), [`@openai/codex`](https://www.npmjs.com/package/@openai/codex), [`@getpaseo/cli`](https://www.npmjs.com/package/@getpaseo/cli), [`@earendil-works/pi-coding-agent`](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) | `paseo` (unified interface over both providers) |
+| [`delpuppoluca/ai-harness`](https://hub.docker.com/r/delpuppoluca/ai-harness) | `latest` | [`@anthropic-ai/claude-code`](https://www.npmjs.com/package/@anthropic-ai/claude-code), [`@openai/codex`](https://www.npmjs.com/package/@openai/codex), [`opencode-ai`](https://www.npmjs.com/package/opencode-ai), [`@getpaseo/cli`](https://www.npmjs.com/package/@getpaseo/cli), [`@earendil-works/pi-coding-agent`](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) | `paseo` (unified interface over both providers) |
 
 ## Quick start
 

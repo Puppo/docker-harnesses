@@ -44,6 +44,16 @@ jobs:
           fi
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
+      - name: Get latest opencode version
+        id: latest_opencode
+        run: |
+          TAG=$(npm view opencode-ai version)
+          if [ -z "$TAG" ]; then
+            echo "Failed to fetch latest version" >&2
+            exit 1
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
       - name: Get latest paseo version
         id: latest_paseo
         run: |
@@ -71,7 +81,7 @@ jobs:
           platform: linux/amd64,linux/arm64
           imageName: delpuppoluca/ai-harness
           dockerFile: Dockerfile.ai-harness
-          label: claude_code_version=${{ steps.latest_claude.outputs.tag }},codex_version=${{ steps.latest_codex.outputs.tag }},paseo_version=${{ steps.latest_paseo.outputs.tag }},pi_version=${{ steps.latest_pi.outputs.tag }}
+          label: claude_code_version=${{ steps.latest_claude.outputs.tag }},codex_version=${{ steps.latest_codex.outputs.tag }},opencode_version=${{ steps.latest_opencode.outputs.tag }},paseo_version=${{ steps.latest_paseo.outputs.tag }},pi_version=${{ steps.latest_pi.outputs.tag }}
           publish: true
           dockerUser: delpuppoluca
           dockerPassword: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
