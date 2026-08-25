@@ -4,7 +4,7 @@ RUN npm i -g \
       @anthropic-ai/claude-code@latest \
       @openai/codex@latest \
       opencode-ai \
-      @getpaseo/cli@latest 
+      @getpaseo/cli@latest \
       @earendil-works/pi-coding-agent@latest
 
 COPY --chmod=755 ai-harness/* /usr/local/bin/
