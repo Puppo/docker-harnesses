@@ -87,9 +87,13 @@ The pattern is reusable: see [CONTRIBUTING.md](CONTRIBUTING.md) for how to add a
 Each image has a matching `.github/workflows/<name>.yml` that:
 
 - Triggers on `push` to `main`, a daily `0 3 * * *` cron, and `workflow_dispatch` (any user with write access can trigger a manual run, optionally with a custom tag).
-- Queries npm for the latest upstream version of every bundled tool and bakes them in as Docker labels.
-- Passes those versions to the Dockerfile as build args, so each tool's layer is restored from a registry build cache when its version did not change. Pulling a new nightly image only downloads and extracts the tools that actually changed.
+- Queries npm for the latest upstream version of every bundled tool and bakes them in as Docker labels, together with the digest of the base image.
+- On scheduled runs, compares those against the labels of the published image and skips the build when nothing changed. Pushes and manual runs always build.
+- Passes the versions to the Dockerfile as build args, so each tool's layer is restored from a registry build cache when its version did not change. Pulling a new nightly image only downloads and extracts the tools that actually changed.
+- Builds each platform locally first and runs every bundled CLI as a smoke test, so a broken upstream package never reaches the registry.
 - Builds and pushes a multi-arch manifest via [`docker/build-push-action`](https://github.com/docker/build-push-action), with layers compressed as zstd for fast extraction on low-power hosts such as a Raspberry Pi (requires Docker Engine 23+ on the client).
+
+Action versions are kept current by Dependabot (`.github/dependabot.yml`), which opens one grouped pull request per week when an action has a new release.
 
 ## License
 

@@ -69,7 +69,7 @@ Each image has three files:
    - `COPY --chmod=755 <name>/*` stages both `entrypoint` and `init` into `/usr/local/bin/`.
    - `ENTRYPOINT ["entrypoint"]` (no path) so it resolves from `$PATH`.
 
-5. **Add the workflow** at `.github/workflows/<name>.yml`. Use the existing workflows as a template — the shape is:
+5. **Add the workflow** at `.github/workflows/<name>.yml`. Use the existing workflows as a template. The real workflow has two jobs: `resolve`, which fetches the latest version of every tool and skips scheduled runs when the published image already has them, and `docker_image`, which smoke tests each platform locally before publishing. The essential shape is:
 
    ```yaml
    name: <Name>
@@ -125,6 +125,8 @@ Each image has three files:
 
    - `build-args` feed the resolved versions into the Dockerfile stages, so the registry cache (`<name>:buildcache`) is hit for every tool that did not change.
    - `compression=zstd` makes layers decompress several times faster than gzip on low-power clients such as a Raspberry Pi. Pulling zstd layers needs Docker Engine 23 or newer on the client.
+   - Before the publish step, build each platform with `load: true` and run every bundled CLI (`<tool> --version`) in the loaded image. A failing upstream package then fails the workflow instead of shipping.
+   - Label the image with every tool version plus the base image digest. The `resolve` job compares those labels with the freshly resolved versions on scheduled runs and skips the build when they match. Copy that job from `ai-harness.yml`.
 
 ## The init-script convention
 
@@ -164,7 +166,8 @@ All images build for both `linux/amd64` and `linux/arm64` via `docker/build-push
 
 - Shell scripts: `set -e`, prefer `bash`, keep them small enough to read at a glance.
 - Dockerfiles: one stage per tool, one `RUN` per logical concern, clean up in the same `RUN` that creates the waste, `COPY --chmod` for entrypoints.
-- Workflows: name steps so the Actions log is readable, fail loudly if an `npm view` returns empty.
+- Workflows: name steps so the Actions log is readable, fail loudly if an `npm view` returns empty, smoke test before publishing.
+- Action versions are bumped by Dependabot (`.github/dependabot.yml`); add new actions with a major version tag (`@v4`) so it can track them.
 
 ## Questions
 

@@ -17,13 +17,25 @@ on:
 permissions:
   contents: read
 
-jobs:
-  docker_image:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
+env:
+  IMAGE: delpuppoluca/ai-harness
+  BASE_IMAGE: node:lts-slim
 
+jobs:
+  # Resolve the latest version of every bundled tool and decide whether the
+  # published image is already up to date. Scheduled runs are skipped when
+  # nothing changed; pushes and manual runs always build.
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      claude: ${{ steps.latest_claude.outputs.tag }}
+      codex: ${{ steps.latest_codex.outputs.tag }}
+      opencode: ${{ steps.latest_opencode.outputs.tag }}
+      paseo: ${{ steps.latest_paseo.outputs.tag }}
+      pi: ${{ steps.latest_pi.outputs.tag }}
+      base_digest: ${{ steps.base.outputs.digest }}
+      build: ${{ steps.check.outputs.build }}
+    steps:
       - name: Get latest claude-code version
         id: latest_claude
         run: |
@@ -74,6 +86,78 @@ jobs:
           fi
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: delpuppoluca
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      # A new base image invalidates every layer, so it counts as a change too.
+      - name: Get base image digest
+        id: base
+        run: |
+          DIGEST=$(docker buildx imagetools inspect "$BASE_IMAGE" --format '{{.Manifest.Digest}}')
+          if [ -z "$DIGEST" ]; then
+            echo "Failed to resolve base image digest" >&2
+            exit 1
+          fi
+          echo "digest=$DIGEST" >> $GITHUB_OUTPUT
+
+      - name: Check whether the published image is up to date
+        id: check
+        run: |
+          if [ "${{ github.event_name }}" != "schedule" ]; then
+            echo "Not a scheduled run; building."
+            echo "build=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          if ! PUBLISHED=$(docker buildx imagetools inspect "${IMAGE}:latest" \
+                --format '{{json (index .Image "linux/amd64").Config.Labels}}' 2>/dev/null); then
+            echo "No published image found; building."
+            echo "build=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          EXPECTED=$(jq -n -S \
+            --arg claude   "${{ steps.latest_claude.outputs.tag }}" \
+            --arg codex    "${{ steps.latest_codex.outputs.tag }}" \
+            --arg opencode "${{ steps.latest_opencode.outputs.tag }}" \
+            --arg paseo    "${{ steps.latest_paseo.outputs.tag }}" \
+            --arg pi       "${{ steps.latest_pi.outputs.tag }}" \
+            --arg base     "${{ steps.base.outputs.digest }}" \
+            '{claude_code_version:$claude, codex_version:$codex, opencode_version:$opencode,
+              paseo_version:$paseo, pi_version:$pi, base_image_digest:$base}')
+          ACTUAL=$(echo "$PUBLISHED" | jq -S .)
+          if [ "$EXPECTED" = "$ACTUAL" ]; then
+            echo "Published image already has these versions; skipping build."
+            echo "build=false" >> $GITHUB_OUTPUT
+          else
+            echo "Published image differs; building."
+            echo "expected: $EXPECTED"
+            echo "actual:   $ACTUAL"
+            echo "build=true" >> $GITHUB_OUTPUT
+          fi
+
+  docker_image:
+    needs: resolve
+    if: needs.resolve.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    env:
+      BUILD_ARGS: |
+        CLAUDE_CODE_VERSION=${{ needs.resolve.outputs.claude }}
+        CODEX_VERSION=${{ needs.resolve.outputs.codex }}
+        OPENCODE_VERSION=${{ needs.resolve.outputs.opencode }}
+        PASEO_VERSION=${{ needs.resolve.outputs.paseo }}
+        PI_VERSION=${{ needs.resolve.outputs.pi }}
+      SMOKE_TEST: >-
+        claude --version &&
+        codex --version &&
+        opencode --version &&
+        pi --version &&
+        paseo --version
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
 
@@ -85,6 +169,38 @@ jobs:
         with:
           username: delpuppoluca
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      # Build each platform into the local Docker daemon first and run every
+      # bundled CLI, so a broken upstream package never reaches the registry.
+      # The stages are cached, so the final multi-platform publish below only
+      # re-exports them.
+      - name: Build linux/amd64 for smoke test
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile.ai-harness
+          platforms: linux/amd64
+          load: true
+          tags: ${{ env.IMAGE }}:smoke-amd64
+          build-args: ${{ env.BUILD_ARGS }}
+          cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache
+
+      - name: Smoke test linux/amd64
+        run: docker run --rm --platform linux/amd64 --entrypoint sh "${IMAGE}:smoke-amd64" -c "$SMOKE_TEST"
+
+      - name: Build linux/arm64 for smoke test
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile.ai-harness
+          platforms: linux/arm64
+          load: true
+          tags: ${{ env.IMAGE }}:smoke-arm64
+          build-args: ${{ env.BUILD_ARGS }}
+          cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache
+
+      - name: Smoke test linux/arm64
+        run: docker run --rm --platform linux/arm64 --entrypoint sh "${IMAGE}:smoke-arm64" -c "$SMOKE_TEST"
 
       # Versions are passed as build args so each tool's stage has a stable
       # cache key: a tool that did not change is restored from the registry
@@ -100,18 +216,14 @@ jobs:
           context: .
           file: Dockerfile.ai-harness
           platforms: linux/amd64,linux/arm64
-          build-args: |
-            CLAUDE_CODE_VERSION=${{ steps.latest_claude.outputs.tag }}
-            CODEX_VERSION=${{ steps.latest_codex.outputs.tag }}
-            OPENCODE_VERSION=${{ steps.latest_opencode.outputs.tag }}
-            PASEO_VERSION=${{ steps.latest_paseo.outputs.tag }}
-            PI_VERSION=${{ steps.latest_pi.outputs.tag }}
+          build-args: ${{ env.BUILD_ARGS }}
           labels: |
-            claude_code_version=${{ steps.latest_claude.outputs.tag }}
-            codex_version=${{ steps.latest_codex.outputs.tag }}
-            opencode_version=${{ steps.latest_opencode.outputs.tag }}
-            paseo_version=${{ steps.latest_paseo.outputs.tag }}
-            pi_version=${{ steps.latest_pi.outputs.tag }}
-          cache-from: type=registry,ref=delpuppoluca/ai-harness:buildcache
-          cache-to: type=registry,ref=delpuppoluca/ai-harness:buildcache,mode=max
-          outputs: type=image,name=delpuppoluca/ai-harness:${{ github.event.inputs.tag || 'latest' }},push=true,oci-mediatypes=true,compression=zstd,force-compression=true
+            claude_code_version=${{ needs.resolve.outputs.claude }}
+            codex_version=${{ needs.resolve.outputs.codex }}
+            opencode_version=${{ needs.resolve.outputs.opencode }}
+            paseo_version=${{ needs.resolve.outputs.paseo }}
+            pi_version=${{ needs.resolve.outputs.pi }}
+            base_image_digest=${{ needs.resolve.outputs.base_digest }}
+          cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache,mode=max
+          outputs: type=image,name=${{ env.IMAGE }}:${{ github.event.inputs.tag || 'latest' }},push=true,oci-mediatypes=true,compression=zstd,force-compression=true
