@@ -88,7 +88,8 @@ Each image has a matching `.github/workflows/<name>.yml` that:
 
 - Triggers on `push` to `main`, a daily `0 3 * * *` cron, and `workflow_dispatch` (any user with write access can trigger a manual run, optionally with a custom tag).
 - Queries npm for the latest upstream version of every bundled tool and bakes them in as Docker labels.
-- Builds and pushes a multi-arch manifest via [`ilteoood/docker_buildx`](https://github.com/ilteoood/docker_buildx).
+- Passes those versions to the Dockerfile as build args, so each tool's layer is restored from a registry build cache when its version did not change. Pulling a new nightly image only downloads and extracts the tools that actually changed.
+- Builds and pushes a multi-arch manifest via [`docker/build-push-action`](https://github.com/docker/build-push-action), with layers compressed as zstd for fast extraction on low-power hosts such as a Raspberry Pi (requires Docker Engine 23+ on the client).
 
 ## License
 

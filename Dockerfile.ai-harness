@@ -1,11 +1,55 @@
+# syntax=docker/dockerfile:1
+
+# Each tool is installed in its own stage under its own npm prefix, then copied
+# into the final image as a separate layer. With a build cache, a tool whose
+# version did not change produces an identical layer, so clients only download
+# and extract the tools that actually changed.
+#
+# Versions default to "latest" for local builds; CI pins them via --build-arg
+# so the cache key is stable between nightly runs.
+
+FROM node:lts-slim AS paseo
+ARG PASEO_VERSION=latest
+RUN npm i -g --no-fund --no-audit --prefix /opt/paseo @getpaseo/cli@${PASEO_VERSION} \
+ && rm -rf /root/.npm /tmp/*
+
+FROM node:lts-slim AS pi
+ARG PI_VERSION=latest
+RUN npm i -g --no-fund --no-audit --prefix /opt/pi @earendil-works/pi-coding-agent@${PI_VERSION} \
+ && rm -rf /root/.npm /tmp/* \
+ # pi ships esbuild binaries for every platform; keep only ours.
+ && find /opt/pi/lib/node_modules/@earendil-works/pi-coding-agent/node_modules/@esbuild \
+      -mindepth 1 -maxdepth 1 ! -name "linux-$(node -p process.arch)" -exec rm -rf {} +
+
+FROM node:lts-slim AS opencode
+ARG OPENCODE_VERSION=latest
+RUN npm i -g --no-fund --no-audit --prefix /opt/opencode @opencode/cli@${OPENCODE_VERSION} \
+ && rm -rf /root/.npm /tmp/* \
+ # The postinstall hardlinks the right binary into bin/, so the per-platform
+ # packages (including the musl one npm installs on glibc) are dead weight.
+ && rm -rf /opt/opencode/lib/node_modules/@opencode/cli/node_modules/@opencode
+
+FROM node:lts-slim AS codex
+ARG CODEX_VERSION=latest
+RUN npm i -g --no-fund --no-audit --prefix /opt/codex @openai/codex@${CODEX_VERSION} \
+ && rm -rf /root/.npm /tmp/*
+
+# Most frequently updated tool goes last: a changed layer invalidates every
+# layer after it on the client, never the ones before it.
+FROM node:lts-slim AS claude
+ARG CLAUDE_CODE_VERSION=latest
+RUN npm i -g --no-fund --no-audit --prefix /opt/claude @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} \
+ && rm -rf /root/.npm /tmp/*
+
 FROM node:lts-slim
 
-RUN npm i -g \
-      @anthropic-ai/claude-code@latest \
-      @openai/codex@latest \
-      @opencode/cli@latest \
-      @getpaseo/cli@latest \
-      @earendil-works/pi-coding-agent@latest
+COPY --from=paseo    /opt/paseo    /opt/paseo
+COPY --from=pi       /opt/pi       /opt/pi
+COPY --from=opencode /opt/opencode /opt/opencode
+COPY --from=codex    /opt/codex    /opt/codex
+COPY --from=claude   /opt/claude   /opt/claude
+
+ENV PATH="/opt/claude/bin:/opt/codex/bin:/opt/opencode/bin:/opt/pi/bin:/opt/paseo/bin:${PATH}"
 
 COPY --chmod=755 ai-harness/* /usr/local/bin/
 
