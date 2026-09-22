@@ -23,11 +23,11 @@ RUN npm i -g --no-fund --no-audit --prefix /opt/pi @earendil-works/pi-coding-age
 
 FROM node:lts-slim AS opencode
 ARG OPENCODE_VERSION=latest
-RUN npm i -g --no-fund --no-audit --prefix /opt/opencode @opencode/cli@${OPENCODE_VERSION} \
+RUN npm i -g --no-fund --no-audit --prefix /opt/opencode opencode-ai@${OPENCODE_VERSION} \
  && rm -rf /root/.npm /tmp/* \
  # The postinstall hardlinks the right binary into bin/, so the per-platform
- # packages (including the musl one npm installs on glibc) are dead weight.
- && rm -rf /opt/opencode/lib/node_modules/@opencode/cli/node_modules/@opencode
+ # packages are dead weight afterwards.
+ && rm -rf /opt/opencode/lib/node_modules/opencode-ai/node_modules/opencode-*
 
 FROM node:lts-slim AS codex
 ARG CODEX_VERSION=latest
