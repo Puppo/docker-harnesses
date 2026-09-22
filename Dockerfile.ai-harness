@@ -3,7 +3,7 @@ FROM node:lts-slim
 RUN npm i -g \
       @anthropic-ai/claude-code@latest \
       @openai/codex@latest \
-      opencode-ai@latest \
+      @opencode/cli@latest \
       @getpaseo/cli@latest \
       @earendil-works/pi-coding-agent@latest
 
