@@ -66,10 +66,10 @@ jobs:
           fi
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
-      - name: Get latest paseo beta version
+      - name: Get latest paseo version
         id: latest_paseo
         run: |
-          TAG=$(npm view @getpaseo/cli dist-tags.beta)
+          TAG=$(npm view @getpaseo/cli version)
           if [ -z "$TAG" ]; then
             echo "Failed to fetch latest version" >&2
             exit 1

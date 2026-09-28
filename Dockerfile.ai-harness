@@ -5,11 +5,11 @@
 # version did not change produces an identical layer, so clients only download
 # and extract the tools that actually changed.
 #
-# Versions default to "latest" (Paseo: "beta") for local builds; CI pins them via --build-arg
+# Versions default to "latest" for local builds; CI pins them via --build-arg
 # so the cache key is stable between nightly runs.
 
 FROM node:lts-slim AS paseo
-ARG PASEO_VERSION=beta
+ARG PASEO_VERSION=latest
 RUN npm i -g --no-fund --no-audit --prefix /opt/paseo @getpaseo/cli@${PASEO_VERSION} \
  && rm -rf /root/.npm /tmp/*
 
