@@ -24,7 +24,7 @@ Most AI coding CLIs are released frequently and expect to be run as the containe
 
 | Image | Tags | Tools bundled | Entrypoint |
 |---|---|---|---|
-| [`delpuppoluca/ai-harness`](https://hub.docker.com/r/delpuppoluca/ai-harness) | `latest` | [`@anthropic-ai/claude-code`](https://www.npmjs.com/package/@anthropic-ai/claude-code), [`@openai/codex`](https://www.npmjs.com/package/@openai/codex), [`@opencode/cli`](https://www.npmjs.com/package/@opencode/cli), [`@getpaseo/cli`](https://www.npmjs.com/package/@getpaseo/cli), [`@earendil-works/pi-coding-agent`](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) | `paseo` (unified interface over both providers) |
+| [`delpuppoluca/ai-harness`](https://hub.docker.com/r/delpuppoluca/ai-harness) | `latest` | [`@anthropic-ai/claude-code`](https://www.npmjs.com/package/@anthropic-ai/claude-code), [`@openai/codex`](https://www.npmjs.com/package/@openai/codex), [`@google/gemini-cli`](https://www.npmjs.com/package/@google/gemini-cli), [`@opencode/cli`](https://www.npmjs.com/package/@opencode/cli), [`@getpaseo/cli`](https://www.npmjs.com/package/@getpaseo/cli), [`@earendil-works/pi-coding-agent`](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) | `paseo` (unified interface over the bundled agents) |
 
 ## Quick start
 
@@ -36,6 +36,7 @@ docker pull delpuppoluca/ai-harness:latest
 docker run --rm -it \
   -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
   -e OPENAI_API_KEY="$OPENAI_API_KEY" \
+  -e GEMINI_API_KEY="$GEMINI_API_KEY" \
   -v "$PWD:/work" -w /work \
   delpuppoluca/ai-harness:latest
 ```

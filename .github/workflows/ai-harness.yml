@@ -30,6 +30,7 @@ jobs:
     outputs:
       claude: ${{ steps.latest_claude.outputs.tag }}
       codex: ${{ steps.latest_codex.outputs.tag }}
+      gemini: ${{ steps.latest_gemini.outputs.tag }}
       opencode: ${{ steps.latest_opencode.outputs.tag }}
       paseo: ${{ steps.latest_paseo.outputs.tag }}
       pi: ${{ steps.latest_pi.outputs.tag }}
@@ -50,6 +51,16 @@ jobs:
         id: latest_codex
         run: |
           TAG=$(npm view @openai/codex version)
+          if [ -z "$TAG" ]; then
+            echo "Failed to fetch latest version" >&2
+            exit 1
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Get latest gemini-cli version
+        id: latest_gemini
+        run: |
+          TAG=$(npm view @google/gemini-cli version)
           if [ -z "$TAG" ]; then
             echo "Failed to fetch latest version" >&2
             exit 1
@@ -120,11 +131,12 @@ jobs:
           EXPECTED=$(jq -n -S \
             --arg claude   "${{ steps.latest_claude.outputs.tag }}" \
             --arg codex    "${{ steps.latest_codex.outputs.tag }}" \
+            --arg gemini   "${{ steps.latest_gemini.outputs.tag }}" \
             --arg opencode "${{ steps.latest_opencode.outputs.tag }}" \
             --arg paseo    "${{ steps.latest_paseo.outputs.tag }}" \
             --arg pi       "${{ steps.latest_pi.outputs.tag }}" \
             --arg base     "${{ steps.base.outputs.digest }}" \
-            '{claude_code_version:$claude, codex_version:$codex, opencode_version:$opencode,
+            '{claude_code_version:$claude, codex_version:$codex, gemini_cli_version:$gemini, opencode_version:$opencode,
               paseo_version:$paseo, pi_version:$pi, base_image_digest:$base}')
           ACTUAL=$(echo "$PUBLISHED" | jq -S .)
           if [ "$EXPECTED" = "$ACTUAL" ]; then
@@ -145,12 +157,14 @@ jobs:
       BUILD_ARGS: |
         CLAUDE_CODE_VERSION=${{ needs.resolve.outputs.claude }}
         CODEX_VERSION=${{ needs.resolve.outputs.codex }}
+        GEMINI_CLI_VERSION=${{ needs.resolve.outputs.gemini }}
         OPENCODE_VERSION=${{ needs.resolve.outputs.opencode }}
         PASEO_VERSION=${{ needs.resolve.outputs.paseo }}
         PI_VERSION=${{ needs.resolve.outputs.pi }}
       SMOKE_TEST: >-
         claude --version &&
         codex --version &&
+        gemini --version &&
         opencode --version &&
         pi --version &&
         paseo --version
@@ -220,6 +234,7 @@ jobs:
           labels: |
             claude_code_version=${{ needs.resolve.outputs.claude }}
             codex_version=${{ needs.resolve.outputs.codex }}
+            gemini_cli_version=${{ needs.resolve.outputs.gemini }}
             opencode_version=${{ needs.resolve.outputs.opencode }}
             paseo_version=${{ needs.resolve.outputs.paseo }}
             pi_version=${{ needs.resolve.outputs.pi }}
