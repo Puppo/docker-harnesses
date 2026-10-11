@@ -34,10 +34,36 @@ ARG CODEX_VERSION=latest
 RUN npm i -g --no-fund --no-audit --prefix /opt/codex @openai/codex@${CODEX_VERSION} \
  && rm -rf /root/.npm /tmp/*
 
-FROM node:lts-slim AS gemini
-ARG GEMINI_CLI_VERSION=latest
-RUN npm i -g --no-fund --no-audit --prefix /opt/gemini @google/gemini-cli@${GEMINI_CLI_VERSION} \
- && rm -rf /root/.npm /tmp/*
+# Antigravity CLI (`agy`) is a native binary, not an npm package. Paseo drives it
+# through its built-in "antigravity" provider. Google publishes one release
+# manifest per platform (the same one its install.sh reads) that only points at
+# the current release, so AGY_VERSION cannot select an older build: it is the
+# cache key, and the build fails if the manifest has moved on in the meantime.
+FROM node:lts-slim AS antigravity
+ARG AGY_VERSION=latest
+ARG AGY_MANIFEST_BASE=https://antigravity-cli-auto-updater-974169037036.us-central1.run.app/manifests
+ARG TARGETARCH
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl jq \
+ && rm -rf /var/lib/apt/lists/*
+RUN set -eu; \
+    case "$TARGETARCH" in \
+      amd64|arm64) ;; \
+      *) echo "Antigravity CLI is not published for linux/${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
+    manifest=$(curl -fsSL "${AGY_MANIFEST_BASE}/linux_${TARGETARCH}.json"); \
+    version=$(echo "$manifest" | jq -er .version); \
+    url=$(echo "$manifest" | jq -er .url); \
+    sha512=$(echo "$manifest" | jq -er .sha512); \
+    if [ "$AGY_VERSION" != latest ] && [ "$version" != "$AGY_VERSION" ]; then \
+      echo "Expected Antigravity CLI ${AGY_VERSION}, manifest has ${version}" >&2; exit 1; \
+    fi; \
+    curl -fsSL -o /tmp/agy.tar.gz "$url"; \
+    echo "${sha512}  /tmp/agy.tar.gz" | sha512sum -c -; \
+    # The archive holds a single binary named `antigravity`; install.sh renames it to `agy`.
+    tar -xzf /tmp/agy.tar.gz -C /tmp antigravity; \
+    install -D -m 0755 /tmp/antigravity /opt/antigravity/bin/agy; \
+    rm -rf /tmp/*
 
 # Most frequently updated tool goes last: a changed layer invalidates every
 # layer after it on the client, never the ones before it.
@@ -48,14 +74,16 @@ RUN npm i -g --no-fund --no-audit --prefix /opt/claude @anthropic-ai/claude-code
 
 FROM node:lts-slim
 
-COPY --from=paseo    /opt/paseo    /opt/paseo
-COPY --from=pi       /opt/pi       /opt/pi
-COPY --from=opencode /opt/opencode /opt/opencode
-COPY --from=codex    /opt/codex    /opt/codex
-COPY --from=gemini   /opt/gemini   /opt/gemini
-COPY --from=claude   /opt/claude   /opt/claude
+COPY --from=paseo       /opt/paseo       /opt/paseo
+COPY --from=pi          /opt/pi          /opt/pi
+COPY --from=opencode    /opt/opencode    /opt/opencode
+COPY --from=codex       /opt/codex       /opt/codex
+COPY --from=antigravity /opt/antigravity /opt/antigravity
+COPY --from=claude      /opt/claude      /opt/claude
 
-ENV PATH="/opt/claude/bin:/opt/gemini/bin:/opt/codex/bin:/opt/opencode/bin:/opt/pi/bin:/opt/paseo/bin:${PATH}"
+# The image pins agy; do not let it replace itself at runtime.
+ENV AGY_CLI_DISABLE_AUTO_UPDATE=1
+ENV PATH="/opt/claude/bin:/opt/antigravity/bin:/opt/codex/bin:/opt/opencode/bin:/opt/pi/bin:/opt/paseo/bin:${PATH}"
 
 COPY --chmod=755 ai-harness/* /usr/local/bin/
 
