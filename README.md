@@ -24,7 +24,7 @@ Most AI coding CLIs are released frequently and expect to be run as the containe
 
 | Image | Tags | Tools bundled | Entrypoint |
 |---|---|---|---|
-| [`delpuppoluca/ai-harness`](https://hub.docker.com/r/delpuppoluca/ai-harness) | `latest` | [`@anthropic-ai/claude-code`](https://www.npmjs.com/package/@anthropic-ai/claude-code), [`@openai/codex`](https://www.npmjs.com/package/@openai/codex), [Antigravity CLI (`agy`)](https://github.com/google-antigravity/antigravity-cli), [`@opencode/cli`](https://www.npmjs.com/package/@opencode/cli), [`@getpaseo/cli`](https://www.npmjs.com/package/@getpaseo/cli), [`@earendil-works/pi-coding-agent`](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) | `paseo` (unified interface over the bundled agents) |
+| [`delpuppoluca/ai-harness`](https://hub.docker.com/r/delpuppoluca/ai-harness) | `latest` | [`@anthropic-ai/claude-code`](https://www.npmjs.com/package/@anthropic-ai/claude-code), [`@openai/codex`](https://www.npmjs.com/package/@openai/codex), [`@google/gemini-cli`](https://www.npmjs.com/package/@google/gemini-cli), [`@opencode/cli`](https://www.npmjs.com/package/@opencode/cli), [`@getpaseo/cli`](https://www.npmjs.com/package/@getpaseo/cli), [`@earendil-works/pi-coding-agent`](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) | `paseo` (unified interface over the bundled agents) |
 
 ## Quick start
 
@@ -36,7 +36,7 @@ docker pull delpuppoluca/ai-harness:latest
 docker run --rm -it \
   -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
   -e OPENAI_API_KEY="$OPENAI_API_KEY" \
-  -v ai-harness-gemini:/root/.gemini \
+  -e GEMINI_API_KEY="$GEMINI_API_KEY" \
   -v "$PWD:/work" -w /work \
   delpuppoluca/ai-harness:latest
 ```
@@ -68,21 +68,6 @@ docker run --rm -it \
   delpuppoluca/ai-harness:latest
 ```
 
-### Antigravity with a Google AI subscription
-
-Paseo ships a built-in `antigravity` provider that drives the bundled `agy` binary, so no Paseo configuration is needed. `agy` signs in with your Google account, which uses your Google AI Pro/Ultra plan instead of an API key. It stores the token under `~/.gemini/antigravity-cli/`, so keep `/root/.gemini` on a named volume.
-
-Sign in once. In a container `agy` prints a URL; open it in your browser, then paste the code back into the terminal:
-
-```bash
-docker run --rm -it \
-  -v ai-harness-gemini:/root/.gemini \
-  --entrypoint=agy \
-  delpuppoluca/ai-harness:latest
-```
-
-Exit `agy` when it shows its prompt, then start the image with the same volume (as in the first example above) and pick **Antigravity** as the agent in Paseo. If Paseo reports the provider as unavailable, run `agy models` in the container: it must list models without asking you to sign in again.
-
 ## Layout
 
 Each image is a self-contained folder plus a Dockerfile at the repo root:
@@ -103,7 +88,7 @@ The pattern is reusable: see [CONTRIBUTING.md](CONTRIBUTING.md) for how to add a
 Each image has a matching `.github/workflows/<name>.yml` that:
 
 - Triggers on `push` to `main`, a daily `0 3 * * *` cron, and `workflow_dispatch` (any user with write access can trigger a manual run, optionally with a custom tag).
-- Queries npm (and Google's release manifests for `agy`) for the latest upstream version of every bundled tool and bakes them in as Docker labels, together with the digest of the base image.
+- Queries npm for the latest upstream version of every bundled tool and bakes them in as Docker labels, together with the digest of the base image.
 - On scheduled runs, compares those against the labels of the published image and skips the build when nothing changed. Pushes and manual runs always build.
 - Passes the versions to the Dockerfile as build args, so each tool's layer is restored from a registry build cache when its version did not change. Pulling a new nightly image only downloads and extracts the tools that actually changed.
 - Builds each platform locally first and runs every bundled CLI as a smoke test, so a broken upstream package never reaches the registry.

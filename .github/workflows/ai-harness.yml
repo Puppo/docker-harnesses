@@ -20,8 +20,6 @@ permissions:
 env:
   IMAGE: delpuppoluca/ai-harness
   BASE_IMAGE: node:lts-slim
-  # Release manifests read by Google's Antigravity CLI installer.
-  AGY_MANIFEST_BASE: https://antigravity-cli-auto-updater-974169037036.us-central1.run.app/manifests
 
 jobs:
   # Resolve the latest version of every bundled tool and decide whether the
@@ -30,9 +28,9 @@ jobs:
   resolve:
     runs-on: ubuntu-latest
     outputs:
-      antigravity: ${{ steps.latest_antigravity.outputs.tag }}
       claude: ${{ steps.latest_claude.outputs.tag }}
       codex: ${{ steps.latest_codex.outputs.tag }}
+      gemini: ${{ steps.latest_gemini.outputs.tag }}
       opencode: ${{ steps.latest_opencode.outputs.tag }}
       paseo: ${{ steps.latest_paseo.outputs.tag }}
       pi: ${{ steps.latest_pi.outputs.tag }}
@@ -59,21 +57,15 @@ jobs:
           fi
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
-      # Both architectures are built from the same version, so they must agree.
-      - name: Get latest antigravity-cli version
-        id: latest_antigravity
+      - name: Get latest gemini-cli version
+        id: latest_gemini
         run: |
-          AMD64=$(curl -fsSL "$AGY_MANIFEST_BASE/linux_amd64.json" | jq -r .version)
-          ARM64=$(curl -fsSL "$AGY_MANIFEST_BASE/linux_arm64.json" | jq -r .version)
-          if [ -z "$AMD64" ] || [ "$AMD64" = "null" ]; then
+          TAG=$(npm view @google/gemini-cli version)
+          if [ -z "$TAG" ]; then
             echo "Failed to fetch latest version" >&2
             exit 1
           fi
-          if [ "$AMD64" != "$ARM64" ]; then
-            echo "Antigravity CLI versions differ: linux_amd64=$AMD64 linux_arm64=$ARM64" >&2
-            exit 1
-          fi
-          echo "tag=$AMD64" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
 
       - name: Get latest opencode version
         id: latest_opencode
@@ -137,14 +129,14 @@ jobs:
             exit 0
           fi
           EXPECTED=$(jq -n -S \
-            --arg antigravity "${{ steps.latest_antigravity.outputs.tag }}" \
-            --arg claude      "${{ steps.latest_claude.outputs.tag }}" \
-            --arg codex       "${{ steps.latest_codex.outputs.tag }}" \
-            --arg opencode    "${{ steps.latest_opencode.outputs.tag }}" \
-            --arg paseo       "${{ steps.latest_paseo.outputs.tag }}" \
-            --arg pi          "${{ steps.latest_pi.outputs.tag }}" \
-            --arg base        "${{ steps.base.outputs.digest }}" \
-            '{antigravity_cli_version:$antigravity, claude_code_version:$claude, codex_version:$codex, opencode_version:$opencode,
+            --arg claude   "${{ steps.latest_claude.outputs.tag }}" \
+            --arg codex    "${{ steps.latest_codex.outputs.tag }}" \
+            --arg gemini   "${{ steps.latest_gemini.outputs.tag }}" \
+            --arg opencode "${{ steps.latest_opencode.outputs.tag }}" \
+            --arg paseo    "${{ steps.latest_paseo.outputs.tag }}" \
+            --arg pi       "${{ steps.latest_pi.outputs.tag }}" \
+            --arg base     "${{ steps.base.outputs.digest }}" \
+            '{claude_code_version:$claude, codex_version:$codex, gemini_cli_version:$gemini, opencode_version:$opencode,
               paseo_version:$paseo, pi_version:$pi, base_image_digest:$base}')
           ACTUAL=$(echo "$PUBLISHED" | jq -S .)
           if [ "$EXPECTED" = "$ACTUAL" ]; then
@@ -163,16 +155,16 @@ jobs:
     runs-on: ubuntu-latest
     env:
       BUILD_ARGS: |
-        AGY_VERSION=${{ needs.resolve.outputs.antigravity }}
         CLAUDE_CODE_VERSION=${{ needs.resolve.outputs.claude }}
         CODEX_VERSION=${{ needs.resolve.outputs.codex }}
+        GEMINI_CLI_VERSION=${{ needs.resolve.outputs.gemini }}
         OPENCODE_VERSION=${{ needs.resolve.outputs.opencode }}
         PASEO_VERSION=${{ needs.resolve.outputs.paseo }}
         PI_VERSION=${{ needs.resolve.outputs.pi }}
       SMOKE_TEST: >-
         claude --version &&
         codex --version &&
-        agy --version &&
+        gemini --version &&
         opencode --version &&
         pi --version &&
         paseo --version
@@ -240,9 +232,9 @@ jobs:
           platforms: linux/amd64,linux/arm64
           build-args: ${{ env.BUILD_ARGS }}
           labels: |
-            antigravity_cli_version=${{ needs.resolve.outputs.antigravity }}
             claude_code_version=${{ needs.resolve.outputs.claude }}
             codex_version=${{ needs.resolve.outputs.codex }}
+            gemini_cli_version=${{ needs.resolve.outputs.gemini }}
             opencode_version=${{ needs.resolve.outputs.opencode }}
             paseo_version=${{ needs.resolve.outputs.paseo }}
             pi_version=${{ needs.resolve.outputs.pi }}
