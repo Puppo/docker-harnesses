@@ -17,9 +17,10 @@ FROM node:lts-slim AS pi
 ARG PI_VERSION=latest
 RUN npm i -g --no-fund --no-audit --prefix /opt/pi @earendil-works/pi-coding-agent@${PI_VERSION} \
  && rm -rf /root/.npm /tmp/* \
- # pi ships esbuild binaries for every platform; keep only ours.
- && find /opt/pi/lib/node_modules/@earendil-works/pi-coding-agent/node_modules/@esbuild \
-      -mindepth 1 -maxdepth 1 ! -name "linux-$(node -p process.arch)" -exec rm -rf {} +
+ # Older pi versions ship esbuild binaries for every platform; keep only ours (no-op if absent).
+ && for d in $(find /opt/pi -type d -name @esbuild -prune); do \
+      find "$d" -mindepth 1 -maxdepth 1 ! -name "linux-$(node -p process.arch)" -exec rm -rf {} +; \
+    done
 
 FROM node:lts-slim AS opencode
 ARG OPENCODE_VERSION=latest
