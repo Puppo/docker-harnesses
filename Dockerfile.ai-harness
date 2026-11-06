@@ -66,6 +66,11 @@ RUN set -eu; \
     install -D -m 0755 /tmp/antigravity /opt/antigravity/bin/agy; \
     rm -rf /tmp/*
 
+FROM node:lts-slim AS copilot
+ARG COPILOT_VERSION=latest
+RUN npm i -g --no-fund --no-audit --prefix /opt/copilot @github/copilot@${COPILOT_VERSION} \
+ && rm -rf /root/.npm /tmp/*
+
 # Most frequently updated tool goes last: a changed layer invalidates every
 # layer after it on the client, never the ones before it.
 FROM node:lts-slim AS claude
@@ -80,11 +85,12 @@ COPY --from=pi          /opt/pi          /opt/pi
 COPY --from=opencode    /opt/opencode    /opt/opencode
 COPY --from=codex       /opt/codex       /opt/codex
 COPY --from=antigravity /opt/antigravity /opt/antigravity
+COPY --from=copilot     /opt/copilot     /opt/copilot
 COPY --from=claude      /opt/claude      /opt/claude
 
 # The image pins agy; do not let it replace itself at runtime.
 ENV AGY_CLI_DISABLE_AUTO_UPDATE=1
-ENV PATH="/opt/claude/bin:/opt/antigravity/bin:/opt/codex/bin:/opt/opencode/bin:/opt/pi/bin:/opt/paseo/bin:${PATH}"
+ENV PATH="/opt/claude/bin:/opt/copilot/bin:/opt/antigravity/bin:/opt/codex/bin:/opt/opencode/bin:/opt/pi/bin:/opt/paseo/bin:${PATH}"
 
 COPY --chmod=755 ai-harness/* /usr/local/bin/
 

@@ -33,6 +33,7 @@ jobs:
       antigravity: ${{ steps.latest_antigravity.outputs.tag }}
       claude: ${{ steps.latest_claude.outputs.tag }}
       codex: ${{ steps.latest_codex.outputs.tag }}
+      copilot: ${{ steps.latest_copilot.outputs.tag }}
       opencode: ${{ steps.latest_opencode.outputs.tag }}
       paseo: ${{ steps.latest_paseo.outputs.tag }}
       pi: ${{ steps.latest_pi.outputs.tag }}
@@ -74,6 +75,16 @@ jobs:
             exit 1
           fi
           echo "tag=$AMD64" >> $GITHUB_OUTPUT
+
+      - name: Get latest copilot version
+        id: latest_copilot
+        run: |
+          TAG=$(npm view @github/copilot version)
+          if [ -z "$TAG" ]; then
+            echo "Failed to fetch latest version" >&2
+            exit 1
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
 
       - name: Get latest opencode version
         id: latest_opencode
@@ -140,11 +151,12 @@ jobs:
             --arg antigravity "${{ steps.latest_antigravity.outputs.tag }}" \
             --arg claude      "${{ steps.latest_claude.outputs.tag }}" \
             --arg codex       "${{ steps.latest_codex.outputs.tag }}" \
+            --arg copilot     "${{ steps.latest_copilot.outputs.tag }}" \
             --arg opencode    "${{ steps.latest_opencode.outputs.tag }}" \
             --arg paseo       "${{ steps.latest_paseo.outputs.tag }}" \
             --arg pi          "${{ steps.latest_pi.outputs.tag }}" \
             --arg base        "${{ steps.base.outputs.digest }}" \
-            '{antigravity_cli_version:$antigravity, claude_code_version:$claude, codex_version:$codex, opencode_version:$opencode,
+            '{antigravity_cli_version:$antigravity, claude_code_version:$claude, codex_version:$codex, copilot_version:$copilot, opencode_version:$opencode,
               paseo_version:$paseo, pi_version:$pi, base_image_digest:$base}')
           ACTUAL=$(echo "$PUBLISHED" | jq -S .)
           if [ "$EXPECTED" = "$ACTUAL" ]; then
@@ -166,12 +178,14 @@ jobs:
         AGY_VERSION=${{ needs.resolve.outputs.antigravity }}
         CLAUDE_CODE_VERSION=${{ needs.resolve.outputs.claude }}
         CODEX_VERSION=${{ needs.resolve.outputs.codex }}
+        COPILOT_VERSION=${{ needs.resolve.outputs.copilot }}
         OPENCODE_VERSION=${{ needs.resolve.outputs.opencode }}
         PASEO_VERSION=${{ needs.resolve.outputs.paseo }}
         PI_VERSION=${{ needs.resolve.outputs.pi }}
       SMOKE_TEST: >-
         claude --version &&
         codex --version &&
+        copilot --version &&
         agy --version &&
         opencode --version &&
         pi --version &&
@@ -243,6 +257,7 @@ jobs:
             antigravity_cli_version=${{ needs.resolve.outputs.antigravity }}
             claude_code_version=${{ needs.resolve.outputs.claude }}
             codex_version=${{ needs.resolve.outputs.codex }}
+            copilot_version=${{ needs.resolve.outputs.copilot }}
             opencode_version=${{ needs.resolve.outputs.opencode }}
             paseo_version=${{ needs.resolve.outputs.paseo }}
             pi_version=${{ needs.resolve.outputs.pi }}
