@@ -5,7 +5,7 @@ on:
     branches:
       - main
   schedule:
-    - cron: '0 3 * * *'
+    - cron: '0 2 * * *'
   workflow_dispatch:
     inputs:
       tag:
@@ -20,6 +20,8 @@ permissions:
 env:
   IMAGE: delpuppoluca/ai-harness
   BASE_IMAGE: node:lts-slim
+  # Release manifests read by Google's Antigravity CLI installer.
+  AGY_MANIFEST_BASE: https://antigravity-cli-auto-updater-974169037036.us-central1.run.app/manifests
 
 jobs:
   # Resolve the latest version of every bundled tool and decide whether the
@@ -28,6 +30,7 @@ jobs:
   resolve:
     runs-on: ubuntu-latest
     outputs:
+      antigravity: ${{ steps.latest_antigravity.outputs.tag }}
       claude: ${{ steps.latest_claude.outputs.tag }}
       codex: ${{ steps.latest_codex.outputs.tag }}
       copilot: ${{ steps.latest_copilot.outputs.tag }}
@@ -56,6 +59,22 @@ jobs:
             exit 1
           fi
           echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      # Both architectures are built from the same version, so they must agree.
+      - name: Get latest antigravity-cli version
+        id: latest_antigravity
+        run: |
+          AMD64=$(curl -fsSL "$AGY_MANIFEST_BASE/linux_amd64.json" | jq -r .version)
+          ARM64=$(curl -fsSL "$AGY_MANIFEST_BASE/linux_arm64.json" | jq -r .version)
+          if [ -z "$AMD64" ] || [ "$AMD64" = "null" ]; then
+            echo "Failed to fetch latest version" >&2
+            exit 1
+          fi
+          if [ "$AMD64" != "$ARM64" ]; then
+            echo "Antigravity CLI versions differ: linux_amd64=$AMD64 linux_arm64=$ARM64" >&2
+            exit 1
+          fi
+          echo "tag=$AMD64" >> $GITHUB_OUTPUT
 
       - name: Get latest copilot version
         id: latest_copilot
@@ -129,14 +148,15 @@ jobs:
             exit 0
           fi
           EXPECTED=$(jq -n -S \
-            --arg claude   "${{ steps.latest_claude.outputs.tag }}" \
-            --arg codex    "${{ steps.latest_codex.outputs.tag }}" \
-            --arg copilot  "${{ steps.latest_copilot.outputs.tag }}" \
-            --arg opencode "${{ steps.latest_opencode.outputs.tag }}" \
-            --arg paseo    "${{ steps.latest_paseo.outputs.tag }}" \
-            --arg pi       "${{ steps.latest_pi.outputs.tag }}" \
-            --arg base     "${{ steps.base.outputs.digest }}" \
-            '{claude_code_version:$claude, codex_version:$codex, copilot_version:$copilot, opencode_version:$opencode,
+            --arg antigravity "${{ steps.latest_antigravity.outputs.tag }}" \
+            --arg claude      "${{ steps.latest_claude.outputs.tag }}" \
+            --arg codex       "${{ steps.latest_codex.outputs.tag }}" \
+            --arg copilot     "${{ steps.latest_copilot.outputs.tag }}" \
+            --arg opencode    "${{ steps.latest_opencode.outputs.tag }}" \
+            --arg paseo       "${{ steps.latest_paseo.outputs.tag }}" \
+            --arg pi          "${{ steps.latest_pi.outputs.tag }}" \
+            --arg base        "${{ steps.base.outputs.digest }}" \
+            '{antigravity_cli_version:$antigravity, claude_code_version:$claude, codex_version:$codex, copilot_version:$copilot, opencode_version:$opencode,
               paseo_version:$paseo, pi_version:$pi, base_image_digest:$base}')
           ACTUAL=$(echo "$PUBLISHED" | jq -S .)
           if [ "$EXPECTED" = "$ACTUAL" ]; then
@@ -155,6 +175,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       BUILD_ARGS: |
+        AGY_VERSION=${{ needs.resolve.outputs.antigravity }}
         CLAUDE_CODE_VERSION=${{ needs.resolve.outputs.claude }}
         CODEX_VERSION=${{ needs.resolve.outputs.codex }}
         COPILOT_VERSION=${{ needs.resolve.outputs.copilot }}
@@ -165,6 +186,7 @@ jobs:
         claude --version &&
         codex --version &&
         copilot --version &&
+        agy --version &&
         opencode --version &&
         pi --version &&
         paseo --version
@@ -232,6 +254,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           build-args: ${{ env.BUILD_ARGS }}
           labels: |
+            antigravity_cli_version=${{ needs.resolve.outputs.antigravity }}
             claude_code_version=${{ needs.resolve.outputs.claude }}
             codex_version=${{ needs.resolve.outputs.codex }}
             copilot_version=${{ needs.resolve.outputs.copilot }}
