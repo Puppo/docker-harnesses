@@ -24,7 +24,7 @@ Most AI coding CLIs are released frequently and expect to be run as the containe
 
 | Image | Tags | Tools bundled | Entrypoint |
 |---|---|---|---|
-| [`delpuppoluca/ai-harness`](https://hub.docker.com/r/delpuppoluca/ai-harness) | `latest` | [`@anthropic-ai/claude-code`](https://www.npmjs.com/package/@anthropic-ai/claude-code), [`@openai/codex`](https://www.npmjs.com/package/@openai/codex), [`@opencode/cli`](https://www.npmjs.com/package/@opencode/cli), [`@getpaseo/cli`](https://www.npmjs.com/package/@getpaseo/cli), [`@earendil-works/pi-coding-agent`](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) | `paseo` (unified interface over both providers) |
+| [`delpuppoluca/ai-harness`](https://hub.docker.com/r/delpuppoluca/ai-harness) | `latest` | [`@anthropic-ai/claude-code`](https://www.npmjs.com/package/@anthropic-ai/claude-code), [`@openai/codex`](https://www.npmjs.com/package/@openai/codex), [`@github/copilot`](https://www.npmjs.com/package/@github/copilot), [`@opencode/cli`](https://www.npmjs.com/package/@opencode/cli), [`@getpaseo/cli`](https://www.npmjs.com/package/@getpaseo/cli), [`@earendil-works/pi-coding-agent`](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) | `paseo` (unified interface over both providers) |
 
 ## Quick start
 
@@ -66,6 +66,17 @@ docker run --rm -it \
   --entrypoint=pi \
   delpuppoluca/ai-harness:latest
 ```
+
+Launch GitHub Copilot CLI directly:
+
+```bash
+docker run --rm -it \
+  -v "$PWD:/work" -w /work \
+  --entrypoint=copilot \
+  delpuppoluca/ai-harness:latest
+```
+
+On first launch, enter `/login` and follow the prompts to authenticate with GitHub.
 
 ## Layout
 
